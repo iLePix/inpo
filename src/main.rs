@@ -41,21 +41,39 @@ async fn check_global_ip() {
 }
 
 async fn check_local_ip() {
-    print!("en0: ");
     match get_if_addrs() {
         Ok(interfaces) => {
-            let en0_ip = interfaces
-                .iter()
-                .filter(|i| i.addr.ip().is_ipv4())
-                .find(|i| i.name == "en0")
-                .map(|i| i.addr.ip());
-            match en0_ip {
-                Some(ip) => println!("{}", ip.to_string().bold().green()),
-                None => println!("FAILED TO FIND INTERFACE WITH NAME 'en0'"),
+            for interface in interfaces {
+                let ip = interface.addr.ip();
+                if !ip.is_ipv4() {
+                    continue;
+                }
+                let class = classify_interface(&interface.name);
+                if class == InterfaceClass::Unknown {
+                    continue;
+                }
+                println!("{}: {}", interface.name, ip.to_string().bold().green());
             }
         }
         Err(e) => {
             println!("FAILED TO GET INTERFACES: {}", e.to_string().bold().red());
         }
+    }
+}
+
+#[derive(Clone, Copy, PartialEq, Eq)]
+enum InterfaceClass {
+    Wifi,
+    Ethernet,
+    Unknown,
+}
+
+fn classify_interface(interface: &str) -> InterfaceClass {
+    match interface {
+        i if i.starts_with("wlan") || i.starts_with("wlo") => InterfaceClass::Wifi,
+        "wlp82s0" => InterfaceClass::Wifi,
+        i if i.starts_with("eth") || i.starts_with("en") => InterfaceClass::Ethernet,
+        "enp0s31f6" => InterfaceClass::Ethernet,
+        _ => InterfaceClass::Unknown,
     }
 }
